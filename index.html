@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>하영's 프리랜서 데스크</title>
+<style>
+@font-face {
+    font-family: 'MaplestoryOTFBold';
+    src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_20-04@2.1/MaplestoryOTFBold.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'MaplestoryOTFLight';
+    src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_20-04@2.1/MaplestoryOTFLight.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+}
+
+:root {
+  /* MapleStory Color Palette */
+  --bg-color: #87CEEB; /* Sky blue background */
+  --panel-bg: #FDF1D6; /* Parchment/Wood inner background */
+  --panel-border: #8B5A2B; /* Dark wood border */
+  --panel-border-light: #CD853F; /* Light wood border for 3D effect */
+  --text-main: #3E2723;
+  --text-muted: #795548;
+  
+  --btn-blue: #4A90E2;
+  --btn-blue-hover: #357ABD;
+  --btn-orange: #FF8C00;
+  --btn-orange-hover: #E67E22;
+  --btn-red: #E74C3C;
+  --btn-wood: #D2B48C;
+  
+  --shadow: 4px 4px 0px rgba(0,0,0,0.2);
+  --shadow-inset: inset -2px -3px 0px rgba(0,0,0,0.15);
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body { 
+  margin: 0; 
+  background: var(--bg-color); 
+  background-image: radial-gradient(#ffffff33 15%, transparent 16%), radial-gradient(#ffffff33 15%, transparent 16%);
+  background-size: 60px 60px;
+  background-position: 0 0, 30px 30px;
+  color: var(--text-main); 
+  font-family: 'MaplestoryOTFBold', 'MaplestoryOTFLight', sans-serif;
+  overflow-x: hidden;
+}
+
+button, input, select, textarea { font-family: inherit; font-size: inherit; }
+button { cursor: pointer; transition: transform 0.1s; }
+button:active { transform: translateY(2px); box-shadow: none !important; }
+
+/* Game-like Panel Frame */
+.game-panel {
+  background: var(--panel-bg);
+  border: 4px solid var(--panel-border);
+  border-radius: var(--radius);
+  box-shadow: inset 3px 3px 0 var(--panel-border-light), var(--shadow);
+  position: relative;
+}
+
+.game-panel::before, .game-panel::after {
+  content: ''; position: absolute; width: 8px; height: 8px; background: #5c3a21; border-radius: 50%;
+}
+.game-panel::before { top: 6px; left: 6px; box-shadow: calc(100% - 20px) 0 #5c3a21; } /* Not perfectly working with variable width, keeping it simple */
+
+/* Layout */
+.app { display: flex; min-height: 100vh; }
+.sidebar { 
+  width: 250px; 
+  background: #5C3A21; /* Dark wood */
+  border-right: 4px solid #3E2723;
+  color: #FDF1D6; 
+  padding: 24px 16px; 
+  position: fixed; inset: 0 auto 0 0;
+  box-shadow: 5px 0 15px rgba(0,0,0,0.2);
+  z-index: 10;
+}
+.brand { font-size: 24px; text-shadow: 2px 2px 0 #3E2723; text-align: center; margin-bottom: 30px; color: #FFD700; }
+.brand small { display: block; color: #F5DEB3; font-size: 13px; margin-top: 8px; text-shadow: none; font-family: 'MaplestoryOTFLight';}
+
+.nav { display: grid; gap: 10px; }
+.nav button { 
+  border: 2px solid transparent; 
+  background: rgba(255,255,255,0.1); 
+  color: #FDF1D6; 
+  text-align: left; 
+  padding: 14px 16px; 
+  border-radius: 8px; 
+  font-size: 16px; 
+}
+.nav button.active, .nav button:hover { 
+  background: var(--btn-orange); 
+  border-color: #FFF;
+  color: #FFF; 
+  text-shadow: 1px 1px 0 #A0522D;
+  box-shadow: inset -2px -2px 0 rgba(0,0,0,0.2);
+}
+.side-bottom { position: absolute; bottom: 20px; left: 20px; right: 20px; color: #DEB887; font-size: 12px; text-align: center; font-family: 'MaplestoryOTFLight';}
+
+.main { margin-left: 250px; width: calc(100% - 250px); padding: 30px 40px 60px; }
+.topbar { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 30px; background: rgba(255,255,255,0.8); padding: 15px 25px; border-radius: var(--radius); border: 3px solid #FFF; box-shadow: var(--shadow); }
+.eyebrow { font-size: 14px; color: var(--text-muted); margin-bottom: 5px; }
+h1 { font-size: 32px; color: var(--text-main); margin: 0; text-shadow: 1px 1px 0 #FFF; }
+.actions { display: flex; gap: 10px; }
+
+/* Buttons */
+.btn { 
+  border: 2px solid var(--text-main); 
+  background: var(--btn-wood); 
+  border-radius: 8px; 
+  padding: 10px 18px; 
+  font-size: 14px; 
+  color: var(--text-main);
+  box-shadow: inset -2px -3px 0 rgba(0,0,0,0.15), 2px 2px 0 rgba(0,0,0,0.2);
+  font-family: 'MaplestoryOTFBold';
+}
+.btn.primary { background: var(--btn-blue); color: #FFF; text-shadow: 1px 1px 0 #2C3E50; }
+.btn.orange { background: var(--btn-orange); color: #FFF; text-shadow: 1px 1px 0 #A0522D; }
+.btn.danger { background: var(--btn-red); color: #FFF; border-color: #8B0000; }
+
+/* Stats Cards */
+.cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px; }
+.card { padding: 20px; text-align: center; background: #FFF; border: 3px solid var(--panel-border); border-radius: var(--radius); box-shadow: 3px 3px 0 var(--panel-border-light); }
+.card .label { font-size: 14px; color: var(--text-muted); }
+.card .value { font-size: 30px; color: #D35400; margin-top: 10px; text-shadow: 1px 1px 0 #F5CBA7; }
+.card .sub { font-size: 12px; color: #95A5A6; margin-top: 8px; font-family: 'MaplestoryOTFLight';}
+
+/* Layout Grid */
+.layout { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: #F4D03F; border-bottom: 4px solid var(--panel-border); color: #3E2723; }
+.panel-title { font-size: 18px; text-shadow: 1px 1px 0 #F9E79F; }
+.panel-sub { font-size: 12px; color: #784212; margin-top: 5px; font-family: 'MaplestoryOTFLight';}
+
+.month-nav { display: flex; align-items: center; gap: 10px; }
+.month-nav button { width: 35px; height: 35px; border-radius: 50%; font-size: 18px; line-height: 1; padding: 0; }
+.month-label { min-width: 120px; text-align: center; font-size: 20px; background: #FFF; padding: 5px 15px; border-radius: 20px; border: 2px solid var(--panel-border); }
+
+.calendar { padding: 15px; background: rgba(255,255,255,0.5); }
+.week { display: grid; grid-template-columns: repeat(7, 1fr); }
+.wday { font-size: 14px; text-align: center; padding: 8px; color: #5C3A21; background: #FDEBD0; border: 1px solid var(--panel-border-light); }
+.day { min-height: 110px; border-bottom: 2px dashed #D2B48C; border-right: 2px dashed #D2B48C; padding: 8px; position: relative; background: #FFF; }
+.day:nth-child(7n) { border-right: 0; }
+.daynum { font-size: 14px; color: #8B5A2B; margin-bottom: 8px; font-family: 'MaplestoryOTFLight'; font-weight: bold;}
+.day.today .daynum { background: #E74C3C; color: #FFF; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; box-shadow: 1px 1px 0 #922B21; }
+.day.other { background: #F9E79F; opacity: 0.6; }
+
+.event { 
+  font-size: 11px; line-height: 1.4; padding: 6px 8px; border-radius: 6px; margin: 4px 0; 
+  cursor: pointer; background: #E8F8F5; border: 2px solid #1ABC9C; color: #0E6251;
+  box-shadow: 1px 1px 0 rgba(0,0,0,0.1);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: 'MaplestoryOTFLight';
+  font-weight: bold;
+}
+/* Event Colors based on role */
+.event.role-bypass { background: #EBF5FB; border-color: #3498DB; color: #1B4F72; } /* 바이패스 */
+.event.role-main { background: #FDEDEC; border-color: #E74C3C; color: #78281F; } /* 진행 */
+.event.role-sub { background: #EAFAF1; border-color: #2ECC71; color: #186A3B; } /* 서브 */
+.event.role-lsm1 { background: #F4ECF7; border-color: #9B59B6; color: #512E5F; } /* LSM1 */
+.event.role-lsm2 { background: #FEF5E7; border-color: #F39C12; color: #7E5109; } /* LSM2 */
+
+.event .fee { font-size: 10px; opacity: 0.8; margin-top: 2px; }
+
+/* Right Sidebar Panels */
+.right { display: grid; gap: 20px; align-content: start; }
+.breakdown, .quick { padding: 20px; background: rgba(255,255,255,0.7); }
+.row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 2px dotted #D2B48C; font-size: 14px; }
+.row:last-child { border-bottom: 0; }
+.progress { height: 12px; background: #E5E7EB; border-radius: 10px; overflow: hidden; margin-top: 8px; border: 1px solid var(--panel-border); }
+.progress i { display: block; height: 100%; background: #2ECC71; }
+
+.quick .mini { padding: 12px 0; border-bottom: 2px dotted #D2B48C; cursor: pointer; transition: background 0.2s;}
+.quick .mini:hover { background: #FFF9E6; }
+.mini-title { font-size: 14px; color: var(--btn-blue); text-shadow: 1px 1px 0 #FFF; }
+.mini-meta { font-size: 12px; color: var(--text-muted); margin-top: 5px; font-family: 'MaplestoryOTFLight';}
+
+.table-panel { margin-top: 25px; }
+.filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 15px 20px; background: #FDEBD0; border-bottom: 3px solid var(--panel-border); }
+input, select, textarea { 
+  border: 2px solid var(--panel-border); background: #FFF; border-radius: 8px; padding: 10px 12px; outline: none; font-size: 14px; 
+  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1);
+}
+input:focus, select:focus, textarea:focus { border-color: var(--btn-blue); }
+
+.table-wrap { overflow: auto; background: #FFF; border-radius: 0 0 var(--radius) var(--radius); }
+table { width: 100%; border-collapse: collapse; min-width: 1000px; text-align: center; }
+th, td { padding: 15px; border-bottom: 2px dotted #D2B48C; font-size: 14px; }
+th { background: #F5CBA7; color: #873600; font-size: 15px; border-bottom: 3px solid var(--panel-border); }
+td strong { color: #D35400; }
+
+.badge { display: inline-block; padding: 5px 10px; border-radius: 20px; font-size: 12px; border: 2px solid transparent; }
+.badge.done { background: #D5F5E3; color: #1D8348; border-color: #2ECC71; }
+.badge.progress { background: #D6EAF8; color: #21618C; border-color: #3498DB; }
+.badge.wait { background: #FCF3CF; color: #9A7D0A; border-color: #F1C40F; }
+.badge.paid { background: #D5F5E3; color: #1D8348; border-color: #2ECC71; }
+.badge.unpaid { background: #FADBD8; color: #922B21; border-color: #E74C3C; }
+
+.amount { text-align: right; font-family: 'MaplestoryOTFLight'; font-weight: bold; font-size: 16px; color: #2C3E50;}
+.empty { text-align: center; color: #95A5A6; padding: 50px; font-size: 18px; }
+
+/* Modal */
+.modal-back { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 100; backdrop-filter: blur(2px); }
+.modal-back.open { display: flex; }
+.modal { width: min(700px, 100%); max-height: 90vh; overflow-y: auto; background: #FDF1D6; border: 6px solid #8B5A2B; border-radius: 16px; box-shadow: inset 4px 4px 0 #CD853F, 0 10px 40px rgba(0,0,0,0.5); }
+.modal-head { padding: 20px 25px; background: #F4D03F; border-bottom: 4px solid #8B5A2B; display: flex; justify-content: space-between; align-items: center; }
+.modal-head strong { font-size: 22px; color: #3E2723; }
+.modal-body { padding: 25px; background: rgba(255,255,255,0.6); }
+
+.form { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.field { display: grid; gap: 5px; }
+.field.full { grid-column: 1 / -1; }
+.field label { font-size: 13px; color: #795548; }
+textarea { min-height: 100px; resize: vertical; }
+
+.modal-foot { display: flex; justify-content: space-between; padding: 20px 25px; background: #FDEBD0; border-top: 4px solid #8B5A2B; }
+
+/* Toast */
+.toast { position: fixed; right: 30px; bottom: 30px; background: #3E2723; color: #FFF; padding: 15px 25px; border-radius: 12px; font-size: 16px; border: 3px solid #F5CBA7; box-shadow: 0 5px 15px rgba(0,0,0,0.3); display: none; z-index: 150; }
+.toast.show { display: block; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+@keyframes popIn { 0% { transform: scale(0.8) translateY(20px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
+
+/* Responsive */
+@media(max-width: 1100px) {
+  .sidebar { width: 200px; }
+  .main { margin-left: 200px; width: calc(100% - 200px); padding: 20px; }
+  .cards { grid-template-columns: repeat(2, 1fr); }
+  .layout { grid-template-columns: 1fr; }
+}
+@media(max-width: 768px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; width: 100%; }
+  .cards { grid-template-columns: 1fr 1fr; }
+  .topbar { flex-direction: column; align-items: flex-start; gap: 15px; }
+  .actions { width: 100%; justify-content: space-between; }
+  .form { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">조하영 PD<small>프리랜서 워크스페이스</small></div>
+    <nav class="nav">
+      <button class="active" onclick="showView('dashboard',this)">🍄 메인 대시보드</button>
+      <button onclick="showView('work',this)">📜 전체 작업 퀘스트</button>
+      <button onclick="showView('rates',this)">💰 법인/거래처 단가</button>
+      <button onclick="showView('settlement',this)">📊 월별 정산 상자</button>
+    </nav>
+    <div class="side-bottom">데이터는 브라우저<br>인벤토리에 저장됩니다.<br><br>Ver 1.0 (Maple Ed.)</div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">BROADCAST PD · LIVE · OPERATION</div>
+        <h1 id="pageTitle">하영's 메이플스토리 워크스페이스</h1>
+      </div>
+      <div class="actions">
+        <button class="btn" onclick="loadSample()">🎁 샘플 퀘스트</button>
+        <button class="btn primary" onclick="openModal()">⚔️ 새 작업 추가</button>
+      </div>
+    </div>
+
+    <div id="dashboardContainer">
+      <section class="cards">
+        <div class="card game-panel"><div class="label">이번 달 획득 예정 메소</div><div class="value" id="mRevenue">₩0</div><div class="sub">완료 + 예정 작업 기준</div></div>
+        <div class="card game-panel"><div class="label">아직 못 받은 메소</div><div class="value" id="mUnpaid" style="color:#E74C3C">₩0</div><div class="sub">정산 전 / 입금 대기</div></div>
+        <div class="card game-panel"><div class="label">이번 달 퀘스트 수</div><div class="value" id="mCount" style="color:#2980B9">0건</div><div class="sub" id="mDone">완료 0건</div></div>
+        <div class="card game-panel"><div class="label">올해 누적 메소</div><div class="value" id="yRevenue" style="color:#8E44AD">₩0</div><div class="sub">현재 입력된 전체 기준</div></div>
+      </section>
+
+      <div class="layout" id="dashboardView">
+        <section class="game-panel">
+          <div class="panel-head">
+            <div><div class="panel-title">🗓️ 작업 캘린더</div><div class="panel-sub">날짜별 방송 진행, 서브, LSM 일정을 확인하세요</div></div>
+            <div class="month-nav">
+              <button class="btn" onclick="changeMonth(-1)">◀</button>
+              <div class="month-label" id="monthLabel"></div>
+              <button class="btn" onclick="changeMonth(1)">▶</button>
+            </div>
+          </div>
+          <div class="calendar">
+            <div class="week">
+              <div class="wday" style="color:#C0392B">일</div><div class="wday">월</div><div class="wday">화</div>
+              <div class="wday">수</div><div class="wday">목</div><div class="wday">금</div><div class="wday" style="color:#2980B9">토</div>
+            </div>
+            <div class="week" id="calendarGrid"></div>
+          </div>
+        </section>
+
+        <aside class="right">
+          <section class="game-panel">
+            <div class="panel-head"><div><div class="panel-title">💰 이번 달 정산 현황</div></div></div>
+            <div class="breakdown" id="breakdown"></div>
+          </section>
+          <section class="game-panel">
+            <div class="panel-head"><div><div class="panel-title">⏰ 다가오는 퀘스트</div></div></div>
+            <div class="quick" id="upcoming"></div>
+          </section>
+        </aside>
+      </div>
+    </div>
+
+    <section class="game-panel table-panel" id="workView" style="display:none">
+      <div class="panel-head">
+        <div><div class="panel-title">📜 전체 작업 퀘스트 목록</div></div>
+      </div>
+      <div class="filters">
+        <span style="font-size:14px; color:#795548;">🔍 필터: </span>
+        <input id="search" placeholder="작업명 또는 거래처 검색" oninput="renderTable()">
+        <select id="filterStatus" onchange="renderTable()">
+          <option value="">상태 전체</option><option>예정</option><option>진행중</option><option>완료</option>
+        </select>
+        <select id="filterPay" onchange="renderTable()">
+          <option value="">정산 전체</option><option>미입금</option><option>입금완료</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>일정</th><th>작업명 / 거래처</th><th>역할</th><th>장소</th><th class="amount">금액(메소)</th><th>진행상태</th><th>정산상태</th><th>관리</th></tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="game-panel table-panel" id="ratesView" style="display:none">
+      <div class="panel-head">
+        <div><div class="panel-title">🤝 거래처별 단가표</div><div class="panel-sub">자주 가는 방송사, 제작사의 역할별 기본 단가를 등록하세요.</div></div>
+      </div>
+      <div style="padding:20px; background:rgba(255,255,255,0.5)">
+        <div style="display:grid;grid-template-columns:1.5fr 1fr 1.2fr auto;gap:15px;align-items:end">
+          <div><label style="display:block;font-size:13px;color:#795548;margin-bottom:5px">법인/거래처명</label><input id="rateClient" placeholder="예: SPOTV / KBSN" style="width:100%"></div>
+          <div><label style="display:block;font-size:13px;color:#795548;margin-bottom:5px">역할 (포지션)</label>
+            <select id="rateType" style="width:100%">
+              <option>바이패스</option><option>진행</option><option>서브</option><option>LSM1</option><option>LSM2</option><option>기타</option>
+            </select>
+          </div>
+          <div><label style="display:block;font-size:13px;color:#795548;margin-bottom:5px">기본 단가 (원)</label><input type="number" id="rateFee" placeholder="250000" style="width:100%"></div>
+          <button class="btn orange" onclick="addRate()" style="height:46px">➕ 등록하기</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>거래처명</th><th>역할 (포지션)</th><th class="amount">기본 단가</th><th></th></tr></thead>
+          <tbody id="rateBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="game-panel table-panel" id="settlementView" style="display:none">
+      <div class="panel-head">
+        <div><div class="panel-title">📊 월별 정산 상자</div></div>
+        <button class="btn primary" onclick="exportCSV()">💾 CSV 다운로드</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>월 (Month)</th><th>완수 퀘스트</th><th class="amount">총 매출액</th><th class="amount">입금 완료</th><th class="amount" style="color:#C0392B">미수금</th><th class="amount">세후 예상(3.3%공제)</th></tr>
+          </thead>
+          <tbody id="settlementBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal-back" id="modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><strong id="modalTitle">⚔️ 새 작업 퀘스트 추가</strong><div class="panel-sub" style="color:#5C3A21">PD님의 방송 일정을 꼼꼼히 기록하세요.</div></div>
+      <button class="btn danger" onclick="closeModal()" style="padding:5px 12px; font-size:16px;">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="workForm" class="form">
+        <input type="hidden" id="editId">
+        <div class="field"><label>작업일 *</label><input type="date" id="date" required></div>
+        <div class="field">
+          <label>업무 시간</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <input type="time" id="startTime"><input type="time" id="endTime">
+          </div>
+        </div>
+        <div class="field full"><label>작업명 (퀘스트 이름) *</label><input id="title" placeholder="예: KBO ○○경기 중계차 진행" required></div>
+        <div class="field"><label>거래처/방송사 *</label><input id="client" list="clientList" placeholder="직접 입력 또는 선택" oninput="applyRate()"><datalist id="clientList"></datalist></div>
+        <div class="field">
+          <label>나의 역할 (포지션)</label>
+          <select id="category" onchange="applyRate()">
+            <option>바이패스</option><option>진행</option><option>서브</option><option>LSM1</option><option>LSM2</option><option>기타</option>
+          </select>
+        </div>
+        <div class="field"><label>장소 (경기장/부조 등)</label><input id="place" placeholder="예: 잠실야구장 / 상암 부조정실"></div>
+        <div class="field"><label>금액 (메소) *</label><input type="number" id="fee" min="0" step="1000" placeholder="거래처/역할 선택 시 자동입력"></div>
+        
+        <div class="field">
+          <label>진행 상태</label>
+          <select id="status"><option>예정</option><option>진행중</option><option>완료</option></select>
+        </div>
+        <div class="field">
+          <label>정산(입금) 상태</label>
+          <select id="payment"><option>미입금</option><option>입금완료</option></select>
+        </div>
+        
+        <div class="field full"><label>메모 및 전달사항</label><textarea id="memo" placeholder="콜 타임, 식대 여부, 특이사항 등을 적어두세요."></textarea></div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <div class="left"><button class="btn danger" id="deleteBtn" onclick="deleteCurrent()" style="display:none">🗑️ 퀘스트 파기</button></div>
+      <div class="left"><button class="btn" onclick="closeModal()">취소</button><button class="btn primary" onclick="saveWork()">💾 저장하기</button></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// Use a different key to avoid conflicts if the user ran the previous version
+const KEY = 'hayoungDesk_v1';
+const RATES_KEY = 'hayoungDeskRates_v1';
+
+let works = JSON.parse(localStorage.getItem(KEY) || '[]');
+let viewDate = new Date(); 
+viewDate.setDate(1);
+
+// Utility Functions
+const fmt = n => '₩' + Number(n||0).toLocaleString('ko-KR');
+const iso = d => { let x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0,10); };
+const today = iso(new Date());
+const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+
+function save() { localStorage.setItem(KEY, JSON.stringify(works)); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function toast(s) { 
+  const t = document.getElementById('toast'); 
+  t.textContent = s; 
+  t.classList.add('show'); 
+  setTimeout(() => t.classList.remove('show'), 2000); 
+}
+
+// Navigation Logic
+function showView(v, btn) {
+  document.querySelectorAll('.nav button').forEach(x => x.classList.remove('active')); 
+  btn.classList.add('active');
+  
+  document.getElementById('dashboardContainer').style.display = v === 'dashboard' ? 'block' : 'none';
+  document.getElementById('workView').style.display = v === 'work' ? 'block' : 'none';
+  document.getElementById('ratesView').style.display = v === 'rates' ? 'block' : 'none';
+  document.getElementById('settlementView').style.display = v === 'settlement' ? 'block' : 'none';
+  
+  let title = "하영's 메이플스토리 워크스페이스";
+  if(v === 'settlement') title = "월별 정산 상자";
+  if(v === 'rates') title = "거래처별 단가 관리";
+  if(v === 'work') title = "전체 작업 퀘스트 목록";
+  document.getElementById('pageTitle').textContent = title;
+
+  if(v === 'settlement') renderSettlement();
+  if(v === 'work') renderTable();
+  if(v === 'rates') renderRates();
+}
+
+function changeMonth(n) { viewDate.setMonth(viewDate.getMonth() + n); renderAll(); }
+function monthWorks() { return works.filter(w => w.date?.slice(0,7) === iso(viewDate).slice(0,7)); }
+
+function renderAll() { 
+  populateClients(); 
+  renderCalendar(); 
+  renderStats(); 
+  renderBreakdown(); 
+  renderUpcoming(); 
+  renderTable(); 
+  renderSettlement(); 
+  renderRates(); 
+}
+
+function getRoleClass(category) {
+  switch(category) {
+    case '바이패스': return 'role-bypass';
+    case '진행': return 'role-main';
+    case '서브': return 'role-sub';
+    case 'LSM1': return 'role-lsm1';
+    case 'LSM2': return 'role-lsm2';
+    default: return '';
+  }
+}
+
+function renderCalendar() {
+  const y = viewDate.getFullYear(), m = viewDate.getMonth(), first = new Date(y, m, 1), last = new Date(y, m+1, 0);
+  document.getElementById('monthLabel').textContent = `${y}년 ${m+1}월`;
+  const grid = document.getElementById('calendarGrid'); 
+  grid.innerHTML = '';
+  
+  const start = first.getDay(), total = Math.ceil((start + last.getDate()) / 7) * 7;
+  
+  for(let i=0; i<total; i++) {
+    const n = i - start + 1, d = new Date(y, m, n), inMonth = n >= 1 && n <= last.getDate(), key = iso(d);
+    const cell = document.createElement('div');
+    cell.className = 'day' + (inMonth ? '' : ' other') + (key === today ? ' today' : '');
+    cell.innerHTML = `<div class="daynum">${d.getDate()}</div>`;
+    
+    if(inMonth) {
+      works.filter(w => w.date === key).slice(0, 4).forEach(w => {
+        const ev = document.createElement('div');
+        ev.className = 'event ' + getRoleClass(w.category);
+        ev.innerHTML = `${esc(w.title)}<div class="fee">${esc(w.client)} · ${w.category} · ${fmt(w.fee)}</div>`;
+        ev.onclick = () => openModal(w.id);
+        cell.appendChild(ev);
+      });
+    }
+    grid.appendChild(cell);
+  }
+}
+
+function renderStats() {
+  const mw = monthWorks(), yr = new Date().getFullYear();
+  const yrw = works.filter(w => w.date?.slice(0,4) == yr);
+  
+  document.getElementById('mRevenue').textContent = fmt(mw.reduce((a,w) => a + Number(w.fee||0), 0));
+  document.getElementById('mUnpaid').textContent = fmt(mw.filter(w => w.payment !== '입금완료').reduce((a,w) => a + Number(w.fee||0), 0));
+  document.getElementById('mCount').textContent = mw.length + '건';
+  document.getElementById('mDone').textContent = '완료 ' + mw.filter(w => w.status === '완료').length + '건';
+  document.getElementById('yRevenue').textContent = fmt(yrw.reduce((a,w) => a + Number(w.fee||0), 0));
+}
+
+function renderBreakdown() {
+  const mw = monthWorks(), total = mw.reduce((a,w) => a + Number(w.fee||0), 0);
+  const paid = mw.filter(w => w.payment === '입금완료').reduce((a,w) => a + Number(w.fee||0), 0);
+  const unpaid = total - paid;
+  const pct = total ? Math.round(paid / total * 100) : 0;
+  
+  document.getElementById('breakdown').innerHTML = `
+    <div class="row"><span>총 예상 매출</span><strong>${fmt(total)}</strong></div>
+    <div class="row"><span>🟢 입금 완료</span><strong style="color:#2ECC71">${fmt(paid)}</strong></div>
+    <div class="row"><span>🔴 미수금</span><strong style="color:#E74C3C">${fmt(unpaid)}</strong></div>
+    <div style="padding-top:15px; font-size:12px; color:#795548; font-family:'MaplestoryOTFLight'">
+      입금 완료율 ${pct}%
+      <div class="progress"><i style="width:${pct}%"></i></div>
+    </div>`;
+}
+
+function renderUpcoming() {
+  const list = works.filter(w => w.date >= today).sort((a,b) => a.date.localeCompare(b.date)).slice(0, 5);
+  document.getElementById('upcoming').innerHTML = list.length ? 
+    list.map(w => `
+      <div class="mini" onclick="openModal('${w.id}')">
+        <div class="mini-title">${esc(w.title)} <span style="font-size:10px;color:#000;">[${w.category}]</span></div>
+        <div class="mini-meta">${w.date} · ${esc(w.client)} · ${esc(w.place||'장소 미정')}</div>
+      </div>`).join('') : '<div class="empty">다가오는 퀘스트가 없습니다.</div>';
+}
+
+function renderTable() {
+  const q = (document.getElementById('search')?.value||'').toLowerCase();
+  const fs = document.getElementById('filterStatus')?.value||'';
+  const fp = document.getElementById('filterPay')?.value||'';
+  
+  const list = works.filter(w => 
+    (!q || `${w.title} ${w.client} ${w.memo}`.toLowerCase().includes(q)) && 
+    (!fs || w.status === fs) && 
+    (!fp || w.payment === fp)
+  ).sort((a,b) => b.date.localeCompare(a.date)); // Sort descending for table
+  
+  const body = document.getElementById('tableBody');
+  body.innerHTML = list.length ? list.map(w => `
+    <tr>
+      <td><strong>${w.date}</strong><div style="font-size:11px;color:#95A5A6;margin-top:4px">${w.startTime||''} ${w.endTime? '~ '+w.endTime:''}</div></td>
+      <td><strong>${esc(w.title)}</strong><div style="font-size:11px;color:#795548;margin-top:4px">${esc(w.client||'')}</div></td>
+      <td><span style="background:#FDEBD0; padding:3px 6px; border-radius:4px; font-size:12px;">${w.category}</span></td>
+      <td>${esc(w.place||'-')}</td>
+      <td class="amount">${fmt(w.fee)}</td>
+      <td><span class="badge ${w.status==='완료'?'done':w.status==='진행중'?'progress':'wait'}">${w.status}</span></td>
+      <td><span class="badge ${w.payment==='입금완료'?'paid':'unpaid'}">${w.payment}</span></td>
+      <td><button class="btn" style="padding:6px 10px; font-size:12px;" onclick="openModal('${w.id}')">수정</button></td>
+    </tr>`).join('') : '<tr><td colspan="8" class="empty">등록된 퀘스트가 없습니다.</td></tr>';
+}
+
+function renderSettlement() {
+  const body = document.getElementById('settlementBody'); 
+  let rows = [];
+  
+  for(let i=0; i<12; i++) {
+    let d = new Date(); d.setMonth(d.getMonth() - i); 
+    let key = d.toISOString().slice(0,7);
+    let list = works.filter(w => w.date?.slice(0,7) === key); 
+    if(!list.length) continue;
+    
+    let total = list.reduce((a,w) => a + Number(w.fee||0), 0);
+    let paid = list.filter(w => w.payment === '입금완료').reduce((a,w) => a + Number(w.fee||0), 0);
+    
+    rows.push(`
+      <tr>
+        <td><strong>${key.replace('-','년 ')}월</strong></td>
+        <td>${list.length}건</td>
+        <td class="amount">${fmt(total)}</td>
+        <td class="amount" style="color:#27AE60">${fmt(paid)}</td>
+        <td class="amount" style="color:#E74C3C">${fmt(total-paid)}</td>
+        <td class="amount" style="color:#2980B9">${fmt(Math.round(total * 0.967))}</td>
+      </tr>`);
+  }
+  body.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="6" class="empty">정산 데이터가 없습니다.</td></tr>';
+}
+
+function rates() { return JSON.parse(localStorage.getItem(RATES_KEY) || '[]'); }
+function saveRates(v) { localStorage.setItem(RATES_KEY, JSON.stringify(v)); }
+
+function renderRates() {
+  const body = document.getElementById('rateBody'); if(!body) return; 
+  const rs = rates();
+  body.innerHTML = rs.length ? rs.map((r,i) => `
+    <tr>
+      <td><strong>${esc(r.client)}</strong></td>
+      <td><span style="background:#FDEBD0; padding:3px 6px; border-radius:4px; font-size:12px;">${esc(r.type)}</span></td>
+      <td class="amount">${fmt(r.fee)}</td>
+      <td><button class="btn danger" style="padding:6px 10px; font-size:12px;" onclick="removeRate(${i})">삭제</button></td>
+    </tr>`).join('') : '<tr><td colspan="4" class="empty">등록된 단가가 없습니다.</td></tr>';
+}
+
+function addRate() {
+  const client = document.getElementById('rateClient').value.trim();
+  const type = document.getElementById('rateType').value;
+  const fee = Number(document.getElementById('rateFee').value || 0);
+  
+  if(!client || !type || !fee) { toast('거래처, 역할, 단가를 모두 입력해주세요.'); return; }
+  
+  const rs = rates(); 
+  const idx = rs.findIndex(r => r.client === client && r.type === type); 
+  
+  if(idx >= 0) rs[idx] = {client, type, fee}; 
+  else rs.push({client, type, fee}); 
+  
+  saveRates(rs);
+  document.getElementById('rateClient').value = '';
+  document.getElementById('rateFee').value = ''; 
+  renderRates(); 
+  toast('단가가 등록되었습니다! 🍄');
+}
+
+function removeRate(i) {
+  const rs = rates(); rs.splice(i,1); saveRates(rs); renderRates(); toast('단가가 삭제되었습니다.');
+}
+
+function populateClients(selected='') {
+  const rs = rates();
+  const existing = works.map(w => w.client).filter(Boolean); 
+  const clients = [...new Set(rs.map(r => r.client).concat(existing))].sort();
+  
+  const dl = document.getElementById('clientList'); 
+  if(!dl) return; 
+  dl.innerHTML = clients.map(c => `<option value="${esc(c)}"></option>`).join(''); 
+  const input = document.getElementById('client'); 
+  if(selected) input.value = selected;
+}
+
+function applyRate() {
+  const client = document.getElementById('client').value.trim();
+  const type = document.getElementById('category').value; 
+  if(!client) return;
+  
+  const rs = rates(); 
+  const exact = rs.find(r => r.client === client && r.type === type) || rs.find(r => r.client === client); 
+  if(exact) document.getElementById('fee').value = exact.fee;
+}
+
+function openModal(id=null) {
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('workForm').reset();
+  document.getElementById('editId').value = '';
+  document.getElementById('date').value = today;
+  document.getElementById('status').value = '예정';
+  document.getElementById('payment').value = '미입금';
+  document.getElementById('category').value = '진행';
+  
+  document.getElementById('modalTitle').textContent = '⚔️ 새 퀘스트 추가';
+  document.getElementById('deleteBtn').style.display = 'none'; 
+  populateClients();
+  
+  if(id) {
+    const w = works.find(x => x.id === id); if(!w) return; 
+    document.getElementById('modalTitle').textContent = '🛠️ 퀘스트 수정';
+    document.getElementById('deleteBtn').style.display = 'block';
+    
+    document.getElementById('editId').value = w.id; 
+    document.getElementById('date').value = w.date || ''; 
+    document.getElementById('startTime').value = w.startTime || ''; 
+    document.getElementById('endTime').value = w.endTime || '';
+    
+    populateClients(w.client || ''); 
+    document.getElementById('title').value = w.title || ''; 
+    document.getElementById('category').value = w.category || '진행'; 
+    document.getElementById('place').value = w.place || '';
+    document.getElementById('fee').value = w.fee || ''; 
+    document.getElementById('status').value = w.status || '예정'; 
+    document.getElementById('payment').value = w.payment || '미입금'; 
+    document.getElementById('memo').value = w.memo || '';
+  }
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+function saveWork() {
+  const id = document.getElementById('editId').value;
+  const w = {
+    id: id || uid(),
+    date: document.getElementById('date').value,
+    startTime: document.getElementById('startTime').value,
+    endTime: document.getElementById('endTime').value,
+    title: document.getElementById('title').value.trim(),
+    client: document.getElementById('client').value.trim(),
+    category: document.getElementById('category').value,
+    place: document.getElementById('place').value.trim(),
+    status: document.getElementById('status').value,
+    fee: Number(document.getElementById('fee').value || 0),
+    payment: document.getElementById('payment').value,
+    memo: document.getElementById('memo').value.trim()
+  };
+  
+  if(!w.date || !w.client || !w.title) { toast('필수 항목(작업일, 거래처, 작업명)을 채워주세요!'); return; }
+  
+  if(id) {
+    works = works.map(x => x.id === id ? w : x); toast('퀘스트가 갱신되었습니다! ✨');
+  } else {
+    works.push(w); toast('새로운 퀘스트를 수락했습니다! 🍄');
+  } 
+  
+  save(); closeModal(); renderAll();
+}
+
+function deleteCurrent() {
+  const id = document.getElementById('editId').value; if(!id) return;
+  if(confirm('정말 이 퀘스트를 삭제(포기)하시겠습니까?')) {
+    works = works.filter(w => w.id !== id);
+    save(); closeModal(); renderAll(); toast('퀘스트가 삭제되었습니다.');
+  }
+}
+
+function loadSample() {
+  // Generate dates relative to today for relevant demo data
+  const d = new Date();
+  const d1 = iso(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 5));
+  const d2 = iso(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1));
+  const d3 = iso(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 2));
+  const d4 = iso(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7));
+
+  const sample = [
+    {date: d1, title: 'KBO 프로야구 개막전', client: 'SPOTV', category: '진행', status: '완료', fee: 350000, payment: '입금완료', place: '잠실야구장', memo: '현장 메인 진행'},
+    {date: d2, title: 'V리그 여자부 중계', client: 'KBSN', category: 'LSM1', status: '완료', fee: 200000, payment: '미입금', place: '수원실내체육관', memo: '슬로우 모션 담당'},
+    {date: d3, title: 'KBL 프로농구 중계', client: '스포티비', category: '서브', status: '예정', fee: 220000, payment: '미입금', place: '상암 부조정실', memo: '스튜디오 서포트'},
+    {date: d4, title: 'e스포츠 리그 결승전', client: 'OGN', category: '바이패스', status: '예정', fee: 300000, payment: '미입금', place: '일산 킨텍스', memo: '바이패스 담당, 식대 포함'}
+  ];
+  works = [...works, ...sample.map(x => ({...x, id: uid()}))];
+  save(); renderAll(); toast('샘플 퀘스트 데이터가 추가되었습니다! 🎁');
+}
+
+function exportCSV() {
+  const header = ['작업일', '시작시간', '종료시간', '작업명(퀘스트)', '거래처', '역할', '장소', '상태', '금액', '정산상태', '메모'];
+  const lines = [header, ...works.map(w => [w.date, w.startTime, w.endTime, w.title, w.client, w.category, w.place, w.status, w.fee, w.payment, w.memo])];
+  const csv = '\ufeff' + lines.map(r => r.map(v => `"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n');
+  const a = document.createElement('a'); 
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = 'hayoung_pd_quests.csv'; 
+  a.click(); 
+  URL.revokeObjectURL(a.href);
+}
+
+// Initial Render
+renderAll();
+</script>
+</body>
+</html>
