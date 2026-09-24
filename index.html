@@ -242,26 +242,27 @@ textarea { min-height: 100px; resize: vertical; }
   .form { grid-template-columns: 1fr; }
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
 <div class="app">
   <aside class="sidebar">
-    <div class="brand">조하영 PD<small>프리랜서 워크스페이스</small></div>
+    <div class="brand">HAYOUNG<small>프리랜서 비용관리</small></div>
     <nav class="nav">
       <button class="active" onclick="showView('dashboard',this)">🍄 메인 대시보드</button>
       <button onclick="showView('work',this)">📜 전체 작업 퀘스트</button>
       <button onclick="showView('rates',this)">💰 법인/거래처 단가</button>
       <button onclick="showView('settlement',this)">📊 월별 정산 상자</button>
     </nav>
-    <div class="side-bottom">데이터는 브라우저<br>인벤토리에 저장됩니다.<br><br>Ver 1.0 (Maple Ed.)</div>
+    <div class="side-bottom">온라인 DB에 저장됩니다.<br>모든 기기에서 동일한 데이터 사용<br><br>Ver 2.0 · Online</div>
   </aside>
 
   <main class="main">
     <div class="topbar">
       <div>
         <div class="eyebrow">BROADCAST PD · LIVE · OPERATION</div>
-        <h1 id="pageTitle">하영's 메이플스토리 워크스페이스</h1>
+        <h1 id="pageTitle">HAYOUNG 비용관리</h1>
       </div>
       <div class="actions">
         <button class="btn" onclick="loadSample()">🎁 샘플 퀘스트</button>
@@ -422,62 +423,248 @@ textarea { min-height: 100px; resize: vertical; }
 <div class="toast" id="toast"></div>
 
 <script>
-// Use a different key to avoid conflicts if the user ran the previous version
+const SUPABASE_URL = 'https://spxgvwppyeolnxjsjyg.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_dkMOUyDxbOxkjzXADG-W0A_tTsw0Dy8';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
 const KEY = 'hayoungDesk_v1';
 const RATES_KEY = 'hayoungDeskRates_v1';
+const MIGRATION_KEY = 'hayoungSupabaseMigrated_v1';
 
-let works = JSON.parse(localStorage.getItem(KEY) || '[]');
-let viewDate = new Date(); 
+let works = [];
+let ratesCache = [];
+let currentUser = null;
+let realtimeChannels = [];
+let viewDate = new Date();
 viewDate.setDate(1);
 
-// Utility Functions
-const fmt = n => '₩' + Number(n||0).toLocaleString('ko-KR');
+const fmt = n => '₩' + Number(n || 0).toLocaleString('ko-KR');
 const iso = d => { let x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0,10); };
 const today = iso(new Date());
 const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 
-function save() { localStorage.setItem(KEY, JSON.stringify(works)); }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
-function toast(s) { 
-  const t = document.getElementById('toast'); 
-  t.textContent = s; 
-  t.classList.add('show'); 
-  setTimeout(() => t.classList.remove('show'), 2000); 
+function rates() { return ratesCache; }
+function save() {}
+function saveRates(v) { ratesCache = v || []; }
+
+function toast(s) {
+  const t = document.getElementById('toast');
+  t.textContent = s;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
 }
 
-// Navigation Logic
+function showLogin(message='') {
+  let gate = document.getElementById('authGate');
+  if (!gate) {
+    gate = document.createElement('div');
+    gate.id = 'authGate';
+    gate.style.cssText = 'position:fixed;inset:0;background:rgba(25,18,12,.82);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10000;backdrop-filter:blur(5px);';
+    document.body.appendChild(gate);
+  }
+  gate.style.display = 'flex';
+  gate.innerHTML =
+    '<div style="width:min(420px,100%);background:#FDF1D6;border:5px solid #8B5A2B;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.45);padding:28px;">' +
+      '<div style="text-align:center;font-size:28px;color:#3E2723;margin-bottom:6px;">HAYOUNG</div>' +
+      '<div style="text-align:center;color:#795548;font-size:14px;margin-bottom:24px;">프리랜서 비용관리</div>' +
+      '<div style="display:grid;gap:12px;">' +
+        '<input id="authEmail" type="email" placeholder="이메일" autocomplete="username" style="width:100%;">' +
+        '<input id="authPassword" type="password" placeholder="비밀번호" autocomplete="current-password" style="width:100%;">' +
+        '<button class="btn primary" id="loginBtn" style="width:100%;">🔐 로그인</button>' +
+        '<div id="authMsg" style="min-height:20px;text-align:center;color:#C0392B;font-size:13px;">' + esc(message) + '</div>' +
+      '</div>' +
+    '</div>';
+
+  document.getElementById('loginBtn').onclick = login;
+  document.getElementById('authPassword').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+}
+
+function hideLogin() {
+  const gate = document.getElementById('authGate');
+  if (gate) gate.style.display = 'none';
+}
+
+function setLoadingMessage(text) {
+  const msg = document.getElementById('authMsg');
+  if (msg) msg.textContent = text;
+}
+
+async function login() {
+  const email = document.getElementById('authEmail')?.value.trim();
+  const password = document.getElementById('authPassword')?.value;
+  if (!email || !password) {
+    setLoadingMessage('이메일과 비밀번호를 입력해주세요.');
+    return;
+  }
+  const btn = document.getElementById('loginBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '로그인 중...'; }
+  const { error } = await db.auth.signInWithPassword({ email, password });
+  if (error) {
+    setLoadingMessage('로그인 실패: ' + error.message);
+    if (btn) { btn.disabled = false; btn.textContent = '🔐 로그인'; }
+  }
+}
+
+async function logout() {
+  await db.auth.signOut();
+}
+
+function addUserButton() {
+  const actions = document.querySelector('.actions');
+  if (!actions || document.getElementById('logoutBtn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'logoutBtn';
+  btn.className = 'btn';
+  btn.textContent = '로그아웃';
+  btn.onclick = logout;
+  actions.insertBefore(btn, actions.firstChild);
+}
+
+function toWorkRow(w) {
+  return {
+    id: w.id,
+    date: w.date,
+    start_time: w.startTime || '',
+    end_time: w.endTime || '',
+    title: w.title,
+    client: w.client,
+    category: w.category || '진행',
+    place: w.place || '',
+    status: w.status || '예정',
+    fee: Number(w.fee || 0),
+    payment: w.payment || '미입금',
+    memo: w.memo || ''
+  };
+}
+
+function fromWorkRow(w) {
+  return {
+    id: w.id,
+    date: w.date,
+    startTime: w.start_time || '',
+    endTime: w.end_time || '',
+    title: w.title || '',
+    client: w.client || '',
+    category: w.category || '진행',
+    place: w.place || '',
+    status: w.status || '예정',
+    fee: Number(w.fee || 0),
+    payment: w.payment || '미입금',
+    memo: w.memo || ''
+  };
+}
+
+function toRateRow(r) {
+  return { client: r.client, type: r.type, fee: Number(r.fee || 0) };
+}
+
+function fromRateRow(r) {
+  return { id: r.id, client: r.client || '', type: r.type || '기타', fee: Number(r.fee || 0) };
+}
+
+async function loadRemote() {
+  if (!currentUser) return;
+  const [wr, rr] = await Promise.all([
+    db.from('works').select('*').order('date', { ascending: true }),
+    db.from('rates').select('*').order('client', { ascending: true }).order('type', { ascending: true })
+  ]);
+  if (wr.error) { console.error(wr.error); toast('작업 데이터 불러오기 실패'); return; }
+  if (rr.error) { console.error(rr.error); toast('단가 데이터 불러오기 실패'); return; }
+  works = (wr.data || []).map(fromWorkRow);
+  ratesCache = (rr.data || []).map(fromRateRow);
+  renderAll();
+}
+
+async function migrateLocalDataOnce() {
+  if (!currentUser || localStorage.getItem(MIGRATION_KEY)) return;
+
+  let oldWorks = [];
+  let oldRates = [];
+  try { oldWorks = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch {}
+  try { oldRates = JSON.parse(localStorage.getItem(RATES_KEY) || '[]'); } catch {}
+
+  if (!oldWorks.length && !oldRates.length) {
+    localStorage.setItem(MIGRATION_KEY, '1');
+    return;
+  }
+
+  let failed = false;
+  if (oldWorks.length) {
+    const { error } = await db.from('works').upsert(oldWorks.map(toWorkRow), { onConflict: 'id' });
+    if (error) { console.error(error); failed = true; }
+  }
+
+  if (oldRates.length) {
+    for (const r of oldRates) {
+      const found = ratesCache.find(x => x.client === r.client && x.type === r.type);
+      let res;
+      if (found) {
+        res = await db.from('rates').update({ fee: Number(r.fee || 0) }).eq('id', found.id);
+      } else {
+        res = await db.from('rates').insert(toRateRow(r));
+      }
+      if (res.error) { console.error(res.error); failed = true; }
+    }
+  }
+
+  if (!failed) {
+    localStorage.setItem(MIGRATION_KEY, '1');
+    await loadRemote();
+    toast('기존 브라우저 데이터도 온라인 DB로 옮겼습니다.');
+  }
+}
+
+function setupRealtime() {
+  realtimeChannels.forEach(ch => db.removeChannel(ch));
+  realtimeChannels = [];
+
+  const workChannel = db.channel('hayoung-works-' + currentUser.id)
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'works', filter: 'owner_id=eq.' + currentUser.id },
+      () => loadRemote())
+    .subscribe();
+
+  const rateChannel = db.channel('hayoung-rates-' + currentUser.id)
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'rates', filter: 'owner_id=eq.' + currentUser.id },
+      () => loadRemote())
+    .subscribe();
+
+  realtimeChannels.push(workChannel, rateChannel);
+}
+
 function showView(v, btn) {
-  document.querySelectorAll('.nav button').forEach(x => x.classList.remove('active')); 
+  document.querySelectorAll('.nav button').forEach(x => x.classList.remove('active'));
   btn.classList.add('active');
-  
   document.getElementById('dashboardContainer').style.display = v === 'dashboard' ? 'block' : 'none';
   document.getElementById('workView').style.display = v === 'work' ? 'block' : 'none';
   document.getElementById('ratesView').style.display = v === 'rates' ? 'block' : 'none';
   document.getElementById('settlementView').style.display = v === 'settlement' ? 'block' : 'none';
-  
-  let title = "하영's 메이플스토리 워크스페이스";
-  if(v === 'settlement') title = "월별 정산 상자";
-  if(v === 'rates') title = "거래처별 단가 관리";
-  if(v === 'work') title = "전체 작업 퀘스트 목록";
+
+  let title = 'HAYOUNG 비용관리';
+  if (v === 'settlement') title = '월별 정산 상자';
+  if (v === 'rates') title = '거래처별 단가 관리';
+  if (v === 'work') title = '전체 작업 퀘스트 목록';
   document.getElementById('pageTitle').textContent = title;
 
-  if(v === 'settlement') renderSettlement();
-  if(v === 'work') renderTable();
-  if(v === 'rates') renderRates();
+  if (v === 'settlement') renderSettlement();
+  if (v === 'work') renderTable();
+  if (v === 'rates') renderRates();
 }
 
 function changeMonth(n) { viewDate.setMonth(viewDate.getMonth() + n); renderAll(); }
 function monthWorks() { return works.filter(w => w.date?.slice(0,7) === iso(viewDate).slice(0,7)); }
 
-function renderAll() { 
-  populateClients(); 
-  renderCalendar(); 
-  renderStats(); 
-  renderBreakdown(); 
-  renderUpcoming(); 
-  renderTable(); 
-  renderSettlement(); 
-  renderRates(); 
+function renderAll() {
+  populateClients();
+  renderCalendar();
+  renderStats();
+  renderBreakdown();
+  renderUpcoming();
+  renderTable();
+  renderSettlement();
+  renderRates();
 }
 
 function getRoleClass(category) {
@@ -492,24 +679,27 @@ function getRoleClass(category) {
 }
 
 function renderCalendar() {
-  const y = viewDate.getFullYear(), m = viewDate.getMonth(), first = new Date(y, m, 1), last = new Date(y, m+1, 0);
-  document.getElementById('monthLabel').textContent = `${y}년 ${m+1}월`;
-  const grid = document.getElementById('calendarGrid'); 
+  const y = viewDate.getFullYear(), m = viewDate.getMonth();
+  const first = new Date(y, m, 1), last = new Date(y, m+1, 0);
+  document.getElementById('monthLabel').textContent = y + '년 ' + (m+1) + '월';
+  const grid = document.getElementById('calendarGrid');
   grid.innerHTML = '';
-  
   const start = first.getDay(), total = Math.ceil((start + last.getDate()) / 7) * 7;
-  
-  for(let i=0; i<total; i++) {
-    const n = i - start + 1, d = new Date(y, m, n), inMonth = n >= 1 && n <= last.getDate(), key = iso(d);
+
+  for (let i=0; i<total; i++) {
+    const n = i - start + 1;
+    const d = new Date(y, m, n);
+    const inMonth = n >= 1 && n <= last.getDate();
+    const key = iso(d);
     const cell = document.createElement('div');
     cell.className = 'day' + (inMonth ? '' : ' other') + (key === today ? ' today' : '');
-    cell.innerHTML = `<div class="daynum">${d.getDate()}</div>`;
-    
-    if(inMonth) {
+    cell.innerHTML = '<div class="daynum">' + d.getDate() + '</div>';
+
+    if (inMonth) {
       works.filter(w => w.date === key).slice(0, 4).forEach(w => {
         const ev = document.createElement('div');
         ev.className = 'event ' + getRoleClass(w.category);
-        ev.innerHTML = `${esc(w.title)}<div class="fee">${esc(w.client)} · ${w.category} · ${fmt(w.fee)}</div>`;
+        ev.innerHTML = esc(w.title) + '<div class="fee">' + esc(w.client) + ' · ' + w.category + ' · ' + fmt(w.fee) + '</div>';
         ev.onclick = () => openModal(w.id);
         cell.appendChild(ev);
       });
@@ -521,7 +711,6 @@ function renderCalendar() {
 function renderStats() {
   const mw = monthWorks(), yr = new Date().getFullYear();
   const yrw = works.filter(w => w.date?.slice(0,4) == yr);
-  
   document.getElementById('mRevenue').textContent = fmt(mw.reduce((a,w) => a + Number(w.fee||0), 0));
   document.getElementById('mUnpaid').textContent = fmt(mw.filter(w => w.payment !== '입금완료').reduce((a,w) => a + Number(w.fee||0), 0));
   document.getElementById('mCount').textContent = mw.length + '건';
@@ -530,141 +719,109 @@ function renderStats() {
 }
 
 function renderBreakdown() {
-  const mw = monthWorks(), total = mw.reduce((a,w) => a + Number(w.fee||0), 0);
+  const mw = monthWorks();
+  const total = mw.reduce((a,w) => a + Number(w.fee||0), 0);
   const paid = mw.filter(w => w.payment === '입금완료').reduce((a,w) => a + Number(w.fee||0), 0);
   const unpaid = total - paid;
   const pct = total ? Math.round(paid / total * 100) : 0;
-  
-  document.getElementById('breakdown').innerHTML = `
-    <div class="row"><span>총 예상 매출</span><strong>${fmt(total)}</strong></div>
-    <div class="row"><span>🟢 입금 완료</span><strong style="color:#2ECC71">${fmt(paid)}</strong></div>
-    <div class="row"><span>🔴 미수금</span><strong style="color:#E74C3C">${fmt(unpaid)}</strong></div>
-    <div style="padding-top:15px; font-size:12px; color:#795548; font-family:'MaplestoryOTFLight'">
-      입금 완료율 ${pct}%
-      <div class="progress"><i style="width:${pct}%"></i></div>
-    </div>`;
+  document.getElementById('breakdown').innerHTML =
+    '<div class="row"><span>총 예상 매출</span><strong>' + fmt(total) + '</strong></div>' +
+    '<div class="row"><span>🟢 입금 완료</span><strong style="color:#2ECC71">' + fmt(paid) + '</strong></div>' +
+    '<div class="row"><span>🔴 미수금</span><strong style="color:#E74C3C">' + fmt(unpaid) + '</strong></div>' +
+    '<div style="padding-top:15px;font-size:12px;color:#795548;font-family:\'MaplestoryOTFLight\'">입금 완료율 ' + pct + '%' +
+    '<div class="progress"><i style="width:' + pct + '%"></i></div></div>';
 }
 
 function renderUpcoming() {
-  const list = works.filter(w => w.date >= today).sort((a,b) => a.date.localeCompare(b.date)).slice(0, 5);
-  document.getElementById('upcoming').innerHTML = list.length ? 
-    list.map(w => `
-      <div class="mini" onclick="openModal('${w.id}')">
-        <div class="mini-title">${esc(w.title)} <span style="font-size:10px;color:#000;">[${w.category}]</span></div>
-        <div class="mini-meta">${w.date} · ${esc(w.client)} · ${esc(w.place||'장소 미정')}</div>
-      </div>`).join('') : '<div class="empty">다가오는 퀘스트가 없습니다.</div>';
+  const list = works.filter(w => w.date >= today).sort((a,b) => a.date.localeCompare(b.date)).slice(0,5);
+  document.getElementById('upcoming').innerHTML = list.length ?
+    list.map(w =>
+      '<div class="mini" onclick="openModal(\'' + w.id + '\')">' +
+      '<div class="mini-title">' + esc(w.title) + ' <span style="font-size:10px;color:#000;">[' + esc(w.category) + ']</span></div>' +
+      '<div class="mini-meta">' + esc(w.date) + ' · ' + esc(w.client) + ' · ' + esc(w.place || '장소 미정') + '</div>' +
+      '</div>'
+    ).join('') :
+    '<div class="empty">다가오는 퀘스트가 없습니다.</div>';
 }
 
 function renderTable() {
-  const q = (document.getElementById('search')?.value||'').toLowerCase();
-  const fs = document.getElementById('filterStatus')?.value||'';
-  const fp = document.getElementById('filterPay')?.value||'';
-  
-  const list = works.filter(w => 
-    (!q || `${w.title} ${w.client} ${w.memo}`.toLowerCase().includes(q)) && 
-    (!fs || w.status === fs) && 
+  const q = (document.getElementById('search')?.value || '').toLowerCase();
+  const fs = document.getElementById('filterStatus')?.value || '';
+  const fp = document.getElementById('filterPay')?.value || '';
+  const list = works.filter(w =>
+    (!q || (w.title + ' ' + w.client + ' ' + w.memo).toLowerCase().includes(q)) &&
+    (!fs || w.status === fs) &&
     (!fp || w.payment === fp)
-  ).sort((a,b) => b.date.localeCompare(a.date)); // Sort descending for table
-  
+  ).sort((a,b) => b.date.localeCompare(a.date));
+
   const body = document.getElementById('tableBody');
-  body.innerHTML = list.length ? list.map(w => `
-    <tr>
-      <td><strong>${w.date}</strong><div style="font-size:11px;color:#95A5A6;margin-top:4px">${w.startTime||''} ${w.endTime? '~ '+w.endTime:''}</div></td>
-      <td><strong>${esc(w.title)}</strong><div style="font-size:11px;color:#795548;margin-top:4px">${esc(w.client||'')}</div></td>
-      <td><span style="background:#FDEBD0; padding:3px 6px; border-radius:4px; font-size:12px;">${w.category}</span></td>
-      <td>${esc(w.place||'-')}</td>
-      <td class="amount">${fmt(w.fee)}</td>
-      <td><span class="badge ${w.status==='완료'?'done':w.status==='진행중'?'progress':'wait'}">${w.status}</span></td>
-      <td><span class="badge ${w.payment==='입금완료'?'paid':'unpaid'}">${w.payment}</span></td>
-      <td><button class="btn" style="padding:6px 10px; font-size:12px;" onclick="openModal('${w.id}')">수정</button></td>
-    </tr>`).join('') : '<tr><td colspan="8" class="empty">등록된 퀘스트가 없습니다.</td></tr>';
+  body.innerHTML = list.length ? list.map(w =>
+    '<tr>' +
+      '<td><strong>' + esc(w.date) + '</strong><div style="font-size:11px;color:#95A5A6;margin-top:4px">' + esc(w.startTime||'') + ' ' + (w.endTime ? '~ ' + esc(w.endTime) : '') + '</div></td>' +
+      '<td><strong>' + esc(w.title) + '</strong><div style="font-size:11px;color:#795548;margin-top:4px">' + esc(w.client||'') + '</div></td>' +
+      '<td><span style="background:#FDEBD0;padding:3px 6px;border-radius:4px;font-size:12px;">' + esc(w.category) + '</span></td>' +
+      '<td>' + esc(w.place||'-') + '</td>' +
+      '<td class="amount">' + fmt(w.fee) + '</td>' +
+      '<td><span class="badge ' + (w.status==='완료'?'done':w.status==='진행중'?'progress':'wait') + '">' + esc(w.status) + '</span></td>' +
+      '<td><span class="badge ' + (w.payment==='입금완료'?'paid':'unpaid') + '">' + esc(w.payment) + '</span></td>' +
+      '<td><button class="btn" style="padding:6px 10px;font-size:12px;" onclick="openModal(\'' + w.id + '\')">수정</button></td>' +
+    '</tr>'
+  ).join('') : '<tr><td colspan="8" class="empty">등록된 퀘스트가 없습니다.</td></tr>';
 }
 
 function renderSettlement() {
-  const body = document.getElementById('settlementBody'); 
+  const body = document.getElementById('settlementBody');
   let rows = [];
-  
-  for(let i=0; i<12; i++) {
-    let d = new Date(); d.setMonth(d.getMonth() - i); 
+  for (let i=0; i<12; i++) {
+    let d = new Date(); d.setMonth(d.getMonth()-i);
     let key = d.toISOString().slice(0,7);
-    let list = works.filter(w => w.date?.slice(0,7) === key); 
-    if(!list.length) continue;
-    
+    let list = works.filter(w => w.date?.slice(0,7) === key);
+    if (!list.length) continue;
     let total = list.reduce((a,w) => a + Number(w.fee||0), 0);
     let paid = list.filter(w => w.payment === '입금완료').reduce((a,w) => a + Number(w.fee||0), 0);
-    
-    rows.push(`
-      <tr>
-        <td><strong>${key.replace('-','년 ')}월</strong></td>
-        <td>${list.length}건</td>
-        <td class="amount">${fmt(total)}</td>
-        <td class="amount" style="color:#27AE60">${fmt(paid)}</td>
-        <td class="amount" style="color:#E74C3C">${fmt(total-paid)}</td>
-        <td class="amount" style="color:#2980B9">${fmt(Math.round(total * 0.967))}</td>
-      </tr>`);
+    rows.push(
+      '<tr><td><strong>' + key.replace('-','년 ') + '월</strong></td>' +
+      '<td>' + list.length + '건</td>' +
+      '<td class="amount">' + fmt(total) + '</td>' +
+      '<td class="amount" style="color:#27AE60">' + fmt(paid) + '</td>' +
+      '<td class="amount" style="color:#E74C3C">' + fmt(total-paid) + '</td>' +
+      '<td class="amount" style="color:#2980B9">' + fmt(Math.round(total*0.967)) + '</td></tr>'
+    );
   }
   body.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="6" class="empty">정산 데이터가 없습니다.</td></tr>';
 }
 
-function rates() { return JSON.parse(localStorage.getItem(RATES_KEY) || '[]'); }
-function saveRates(v) { localStorage.setItem(RATES_KEY, JSON.stringify(v)); }
-
 function renderRates() {
-  const body = document.getElementById('rateBody'); if(!body) return; 
+  const body = document.getElementById('rateBody');
+  if (!body) return;
   const rs = rates();
-  body.innerHTML = rs.length ? rs.map((r,i) => `
-    <tr>
-      <td><strong>${esc(r.client)}</strong></td>
-      <td><span style="background:#FDEBD0; padding:3px 6px; border-radius:4px; font-size:12px;">${esc(r.type)}</span></td>
-      <td class="amount">${fmt(r.fee)}</td>
-      <td><button class="btn danger" style="padding:6px 10px; font-size:12px;" onclick="removeRate(${i})">삭제</button></td>
-    </tr>`).join('') : '<tr><td colspan="4" class="empty">등록된 단가가 없습니다.</td></tr>';
-}
-
-function addRate() {
-  const client = document.getElementById('rateClient').value.trim();
-  const type = document.getElementById('rateType').value;
-  const fee = Number(document.getElementById('rateFee').value || 0);
-  
-  if(!client || !type || !fee) { toast('거래처, 역할, 단가를 모두 입력해주세요.'); return; }
-  
-  const rs = rates(); 
-  const idx = rs.findIndex(r => r.client === client && r.type === type); 
-  
-  if(idx >= 0) rs[idx] = {client, type, fee}; 
-  else rs.push({client, type, fee}); 
-  
-  saveRates(rs);
-  document.getElementById('rateClient').value = '';
-  document.getElementById('rateFee').value = ''; 
-  renderRates(); 
-  toast('단가가 등록되었습니다! 🍄');
-}
-
-function removeRate(i) {
-  const rs = rates(); rs.splice(i,1); saveRates(rs); renderRates(); toast('단가가 삭제되었습니다.');
+  body.innerHTML = rs.length ? rs.map((r,i) =>
+    '<tr>' +
+      '<td><strong>' + esc(r.client) + '</strong></td>' +
+      '<td><span style="background:#FDEBD0;padding:3px 6px;border-radius:4px;font-size:12px;">' + esc(r.type) + '</span></td>' +
+      '<td class="amount">' + fmt(r.fee) + '</td>' +
+      '<td><button class="btn danger" style="padding:6px 10px;font-size:12px;" onclick="removeRate(' + i + ')">삭제</button></td>' +
+    '</tr>'
+  ).join('') : '<tr><td colspan="4" class="empty">등록된 단가가 없습니다.</td></tr>';
 }
 
 function populateClients(selected='') {
   const rs = rates();
-  const existing = works.map(w => w.client).filter(Boolean); 
+  const existing = works.map(w => w.client).filter(Boolean);
   const clients = [...new Set(rs.map(r => r.client).concat(existing))].sort();
-  
-  const dl = document.getElementById('clientList'); 
-  if(!dl) return; 
-  dl.innerHTML = clients.map(c => `<option value="${esc(c)}"></option>`).join(''); 
-  const input = document.getElementById('client'); 
-  if(selected) input.value = selected;
+  const dl = document.getElementById('clientList');
+  if (!dl) return;
+  dl.innerHTML = clients.map(c => '<option value="' + esc(c) + '"></option>').join('');
+  const input = document.getElementById('client');
+  if (selected) input.value = selected;
 }
 
 function applyRate() {
   const client = document.getElementById('client').value.trim();
-  const type = document.getElementById('category').value; 
-  if(!client) return;
-  
-  const rs = rates(); 
-  const exact = rs.find(r => r.client === client && r.type === type) || rs.find(r => r.client === client); 
-  if(exact) document.getElementById('fee').value = exact.fee;
+  const type = document.getElementById('category').value;
+  if (!client) return;
+  const exact = rates().find(r => r.client === client && r.type === type) || rates().find(r => r.client === client);
+  if (exact) document.getElementById('fee').value = exact.fee;
 }
 
 function openModal(id=null) {
@@ -675,35 +832,33 @@ function openModal(id=null) {
   document.getElementById('status').value = '예정';
   document.getElementById('payment').value = '미입금';
   document.getElementById('category').value = '진행';
-  
-  document.getElementById('modalTitle').textContent = '⚔️ 새 퀘스트 추가';
-  document.getElementById('deleteBtn').style.display = 'none'; 
+  document.getElementById('modalTitle').textContent = '⚔️ 새 작업 추가';
+  document.getElementById('deleteBtn').style.display = 'none';
   populateClients();
-  
-  if(id) {
-    const w = works.find(x => x.id === id); if(!w) return; 
-    document.getElementById('modalTitle').textContent = '🛠️ 퀘스트 수정';
+
+  if (id) {
+    const w = works.find(x => x.id === id);
+    if (!w) return;
+    document.getElementById('modalTitle').textContent = '🛠️ 작업 수정';
     document.getElementById('deleteBtn').style.display = 'block';
-    
-    document.getElementById('editId').value = w.id; 
-    document.getElementById('date').value = w.date || ''; 
-    document.getElementById('startTime').value = w.startTime || ''; 
+    document.getElementById('editId').value = w.id;
+    document.getElementById('date').value = w.date || '';
+    document.getElementById('startTime').value = w.startTime || '';
     document.getElementById('endTime').value = w.endTime || '';
-    
-    populateClients(w.client || ''); 
-    document.getElementById('title').value = w.title || ''; 
-    document.getElementById('category').value = w.category || '진행'; 
+    populateClients(w.client || '');
+    document.getElementById('title').value = w.title || '';
+    document.getElementById('category').value = w.category || '진행';
     document.getElementById('place').value = w.place || '';
-    document.getElementById('fee').value = w.fee || ''; 
-    document.getElementById('status').value = w.status || '예정'; 
-    document.getElementById('payment').value = w.payment || '미입금'; 
+    document.getElementById('fee').value = w.fee || '';
+    document.getElementById('status').value = w.status || '예정';
+    document.getElementById('payment').value = w.payment || '미입금';
     document.getElementById('memo').value = w.memo || '';
   }
 }
 
 function closeModal() { document.getElementById('modal').classList.remove('open'); }
 
-function saveWork() {
+async function saveWork() {
   const id = document.getElementById('editId').value;
   const w = {
     id: id || uid(),
@@ -719,57 +874,155 @@ function saveWork() {
     payment: document.getElementById('payment').value,
     memo: document.getElementById('memo').value.trim()
   };
-  
-  if(!w.date || !w.client || !w.title) { toast('필수 항목(작업일, 거래처, 작업명)을 채워주세요!'); return; }
-  
-  if(id) {
-    works = works.map(x => x.id === id ? w : x); toast('퀘스트가 갱신되었습니다! ✨');
-  } else {
-    works.push(w); toast('새로운 퀘스트를 수락했습니다! 🍄');
-  } 
-  
-  save(); closeModal(); renderAll();
-}
 
-function deleteCurrent() {
-  const id = document.getElementById('editId').value; if(!id) return;
-  if(confirm('정말 이 퀘스트를 삭제(포기)하시겠습니까?')) {
-    works = works.filter(w => w.id !== id);
-    save(); closeModal(); renderAll(); toast('퀘스트가 삭제되었습니다.');
+  if (!w.date || !w.client || !w.title) {
+    toast('필수 항목(작업일, 거래처, 작업명)을 채워주세요!');
+    return;
   }
+
+  const { error } = await db.from('works').upsert(toWorkRow(w), { onConflict: 'id' });
+  if (error) {
+    console.error(error);
+    toast('저장 실패: ' + error.message);
+    return;
+  }
+
+  closeModal();
+  await loadRemote();
+  toast(id ? '작업이 갱신되었습니다.' : '새 작업이 저장되었습니다.');
 }
 
-function loadSample() {
-  // Generate dates relative to today for relevant demo data
+async function deleteCurrent() {
+  const id = document.getElementById('editId').value;
+  if (!id) return;
+  if (!confirm('정말 이 작업을 삭제하시겠습니까?')) return;
+
+  const { error } = await db.from('works').delete().eq('id', id);
+  if (error) {
+    console.error(error);
+    toast('삭제 실패: ' + error.message);
+    return;
+  }
+  closeModal();
+  await loadRemote();
+  toast('작업이 삭제되었습니다.');
+}
+
+async function addRate() {
+  const client = document.getElementById('rateClient').value.trim();
+  const type = document.getElementById('rateType').value;
+  const fee = Number(document.getElementById('rateFee').value || 0);
+  if (!client || !type || !fee) {
+    toast('거래처, 역할, 단가를 모두 입력해주세요.');
+    return;
+  }
+
+  const existing = rates().find(r => r.client === client && r.type === type);
+  let result;
+  if (existing) {
+    result = await db.from('rates').update({ fee }).eq('id', existing.id);
+  } else {
+    result = await db.from('rates').insert(toRateRow({ client, type, fee }));
+  }
+  if (result.error) {
+    console.error(result.error);
+    toast('단가 저장 실패: ' + result.error.message);
+    return;
+  }
+  document.getElementById('rateClient').value = '';
+  document.getElementById('rateFee').value = '';
+  await loadRemote();
+  toast('단가가 등록되었습니다.');
+}
+
+async function removeRate(i) {
+  const item = rates()[i];
+  if (!item) return;
+  if (!confirm('이 거래처 단가를 삭제하시겠습니까?')) return;
+
+  const { error } = await db.from('rates').delete().eq('id', item.id);
+  if (error) {
+    console.error(error);
+    toast('단가 삭제 실패: ' + error.message);
+    return;
+  }
+  await loadRemote();
+  toast('단가가 삭제되었습니다.');
+}
+
+async function loadSample() {
   const d = new Date();
-  const d1 = iso(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 5));
-  const d2 = iso(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1));
-  const d3 = iso(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 2));
-  const d4 = iso(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7));
+  const d1 = iso(new Date(d.getFullYear(), d.getMonth(), d.getDate()-5));
+  const d2 = iso(new Date(d.getFullYear(), d.getMonth(), d.getDate()-1));
+  const d3 = iso(new Date(d.getFullYear(), d.getMonth(), d.getDate()+2));
+  const d4 = iso(new Date(d.getFullYear(), d.getMonth(), d.getDate()+7));
 
   const sample = [
-    {date: d1, title: 'KBO 프로야구 개막전', client: 'SPOTV', category: '진행', status: '완료', fee: 350000, payment: '입금완료', place: '잠실야구장', memo: '현장 메인 진행'},
-    {date: d2, title: 'V리그 여자부 중계', client: 'KBSN', category: 'LSM1', status: '완료', fee: 200000, payment: '미입금', place: '수원실내체육관', memo: '슬로우 모션 담당'},
-    {date: d3, title: 'KBL 프로농구 중계', client: '스포티비', category: '서브', status: '예정', fee: 220000, payment: '미입금', place: '상암 부조정실', memo: '스튜디오 서포트'},
-    {date: d4, title: 'e스포츠 리그 결승전', client: 'OGN', category: '바이패스', status: '예정', fee: 300000, payment: '미입금', place: '일산 킨텍스', memo: '바이패스 담당, 식대 포함'}
+    {date:d1,title:'KBO 프로야구 개막전',client:'SPOTV',category:'진행',status:'완료',fee:350000,payment:'입금완료',place:'잠실야구장',memo:'현장 메인 진행',id:uid()},
+    {date:d2,title:'V리그 여자부 중계',client:'KBSN',category:'LSM1',status:'완료',fee:200000,payment:'미입금',place:'수원실내체육관',memo:'슬로우 모션 담당',id:uid()},
+    {date:d3,title:'KBL 프로농구 중계',client:'스포티비',category:'서브',status:'예정',fee:220000,payment:'미입금',place:'상암 부조정실',memo:'스튜디오 서포트',id:uid()},
+    {date:d4,title:'e스포츠 리그 결승전',client:'OGN',category:'바이패스',status:'예정',fee:300000,payment:'미입금',place:'일산 킨텍스',memo:'바이패스 담당, 식대 포함',id:uid()}
   ];
-  works = [...works, ...sample.map(x => ({...x, id: uid()}))];
-  save(); renderAll(); toast('샘플 퀘스트 데이터가 추가되었습니다! 🎁');
+
+  const { error } = await db.from('works').upsert(sample.map(toWorkRow), { onConflict:'id' });
+  if (error) {
+    console.error(error);
+    toast('샘플 저장 실패: ' + error.message);
+    return;
+  }
+  await loadRemote();
+  toast('샘플 퀘스트가 온라인 DB에 추가되었습니다.');
 }
 
 function exportCSV() {
-  const header = ['작업일', '시작시간', '종료시간', '작업명(퀘스트)', '거래처', '역할', '장소', '상태', '금액', '정산상태', '메모'];
-  const lines = [header, ...works.map(w => [w.date, w.startTime, w.endTime, w.title, w.client, w.category, w.place, w.status, w.fee, w.payment, w.memo])];
-  const csv = '\ufeff' + lines.map(r => r.map(v => `"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n');
-  const a = document.createElement('a'); 
+  const header = ['작업일','시작시간','종료시간','작업명(퀘스트)','거래처','역할','장소','상태','금액','정산상태','메모'];
+  const lines = [header, ...works.map(w => [w.date,w.startTime,w.endTime,w.title,w.client,w.category,w.place,w.status,w.fee,w.payment,w.memo])];
+  const csv = '\ufeff' + lines.map(r => r.map(v => '"' + String(v ?? '').replaceAll('"','""') + '"').join(',')).join('\n');
+  const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
-  a.download = 'hayoung_pd_quests.csv'; 
-  a.click(); 
+  a.download = 'hayoung_pd_quests.csv';
+  a.click();
   URL.revokeObjectURL(a.href);
 }
 
-// Initial Render
+async function onSignedIn(session) {
+  currentUser = session.user;
+  hideLogin();
+  addUserButton();
+  await loadRemote();
+  await migrateLocalDataOnce();
+  await loadRemote();
+  setupRealtime();
+}
+
+async function init() {
+  showLogin();
+  const { data } = await db.auth.getSession();
+  if (data.session) {
+    await onSignedIn(data.session);
+  }
+
+  db.auth.onAuthStateChange(async (_event, session) => {
+    if (session) {
+      await onSignedIn(session);
+    } else {
+      currentUser = null;
+      works = [];
+      ratesCache = [];
+      realtimeChannels.forEach(ch => db.removeChannel(ch));
+      realtimeChannels = [];
+      renderAll();
+      showLogin();
+    }
+  });
+
+  window.addEventListener('focus', () => {
+    if (currentUser) loadRemote();
+  });
+}
+
 renderAll();
+init();
 </script>
 </body>
 </html>
